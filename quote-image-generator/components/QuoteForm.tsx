@@ -1,4 +1,6 @@
 "use client";
+
+import * as React from "react";
 import {
   Card,
   CardContent,
@@ -18,64 +20,63 @@ import {
   Image as ImageIcon,
 } from "lucide-react";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
-import React from "react";
 
-// Define the component's state
-type FormState = {
-  quote: string;
-  author: string;
-  isLoading: boolean;
-  error: string | null;
-  imageUrl: string | null;
+import { useFormStatus } from "react-dom";
+import { useActionState } from "react";
+import { generateQuoteImage, type ActionState } from "@/app/actions";
+
+const initialState: ActionState = {
+  error: undefined,
+  imageId: undefined,
 };
 
+function SubmitButton() {
+  const { pending } = useFormStatus();
+
+  return (
+    <Button type="submit" disabled={pending} className="w-full">
+      {pending ? (
+        <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+      ) : (
+        <ImageIcon className="mr-2 h-4 w-4" />
+      )}
+      {pending ? "Generating Image..." : "Generate Image"}
+    </Button>
+  );
+}
+
 export function QuoteForm() {
-  const [state, setState] = React.useState<FormState>({
+  const [state, formAction] = useActionState(generateQuoteImage, initialState);
+
+  const [inputs, setInputs] = React.useState({
     quote:
       "The greatest glory in living lies not in never falling, but in rising every time we fall.",
     author: "Nelson Mandela",
-    isLoading: false,
-    error: null,
-    imageUrl: null,
   });
 
-  const handleSubmit = async (event: React.FormEvent<HTMLFormElement>) => {
-    event.preventDefault();
-    
-    setState((prev) => ({
-      ...prev,
-      isLoading: true,
-      error: null,
-      imageUrl: null,
-    }));
+  const formRef = React.useRef<HTMLFormElement>(null);
 
-    console.log("Form Submitted:", {
-      quote: state.quote,
-      author: state.author,
-    });
-
-    // Simulate a fake API call (2 seconds)
-    await new Promise((resolve) => setTimeout(resolve, 2000));
-    setState((prev) => ({
-      ...prev,
-      isLoading: false,
-      // We use a placeholder image for now
-      imageUrl: `https://placehold.co/1200x630/1a202c/e2e8f0?text=${encodeURIComponent(
-        `"${prev.quote.substring(0, 50)}..."`
-      )}`,
-    }));
-  };
-
-  // Helper function to update state on input change
   const handleChange = (
     e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>
   ) => {
     const { name, value } = e.target;
-    setState((prev) => ({
+    setInputs((prev) => ({
       ...prev,
       [name]: value,
     }));
   };
+
+  React.useEffect(() => {
+    if (state.imageId) {
+      formRef.current?.reset();
+      setInputs({
+        quote: "",
+        author: "",
+      });
+    }
+  }, [state]); 
+
+  const imageUrl = state.imageId ? `/api/og?id=${state.imageId}` : null;
 
   return (
     // Main card wrapping the entire UI
@@ -89,7 +90,8 @@ export function QuoteForm() {
         </CardDescription>
       </CardHeader>
       
-      <form onSubmit={handleSubmit}>
+      {/* 8. The <form> now uses the 'action' prop */}
+      <form ref={formRef} action={formAction}>
         <CardContent className="space-y-4">
           {/* Quote Textarea */}
           <div className="space-y-2">
@@ -98,15 +100,15 @@ export function QuoteForm() {
               id="quote"
               name="quote"
               placeholder="Enter your quote..."
-              value={state.quote}
-              onChange={handleChange}
+              value={inputs.quote} 
+              onChange={handleChange} 
               rows={4}
               maxLength={280}
               required
               className="resize-none"
             />
             <p className="text-sm text-muted-foreground text-right">
-              {state.quote.length} / 280
+              {inputs.quote.length} / 280
             </p>
           </div>
 
@@ -117,13 +119,13 @@ export function QuoteForm() {
               id="author"
               name="author"
               placeholder="e.g., Nelson Mandela or @username"
-              value={state.author}
-              onChange={handleChange}
+              value={inputs.author}
+              onChange={handleChange} 
               maxLength={50}
             />
           </div>
 
-          {/* Error Alert */}
+          {/* 9. Error Alert reads from the action state */}
           {state.error && (
             <Alert variant="destructive">
               <AlertCircle className="h-4 w-4" />
@@ -134,36 +136,26 @@ export function QuoteForm() {
         </CardContent>
 
         <CardFooter className="flex flex-col items-stretch space-y-4">
-          {/* Submit Button */}
-          <Button type="submit" disabled={state.isLoading} className="w-full">
-            {state.isLoading ? (
-              <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-            ) : (
-              <ImageIcon className="mr-2 h-4 w-4" />
-            )}
-            {state.isLoading ? "Generating Image..." : "Generate Image"}
-          </Button>
+          <SubmitButton />
         </CardFooter>
       </form>
 
-      {/* --- RESULT PREVIEW --- */}
       {/* This section only appears *after* the image is generated */}
-      {state.imageUrl && !state.isLoading && (
+      {imageUrl && (
         <CardFooter className="flex flex-col items-stretch space-y-4 border-t pt-4">
           <h3 className="text-lg font-semibold text-center">Your Image</h3>
           
-          {/* Image Preview */}
           <div className="rounded-lg border bg-muted/30 overflow-hidden">
             <img
-              src={state.imageUrl}
+              src={imageUrl}
               alt="Generated quote"
               className="w-full h-auto aspect-video object-cover"
+              key={state.imageId}
             />
           </div>
 
-          {/* Download Button */}
           <Button asChild variant="secondary">
-            <a href={state.imageUrl} download="quote.png">
+            <a href={imageUrl} download="quote.png">
               <Download className="mr-2 h-4 w-4" />
               Download Image
             </a>
