@@ -1,0 +1,18 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "mongodb"
+  url      = env("DATABASE_URL")
+}
+
+// Our data model for storing quote details
+model QuoteImage {
+  id        String   @id @default(auto()) @map("_id") @db.ObjectId
+  quote     String   // The main text of the quote
+  author    String?  // The optional author
+  createdAt DateTime @default(now())
+
+  @@map("quote_images")
+}
